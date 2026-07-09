@@ -37,3 +37,6 @@ add_compile_options(
     -Wno-stringop-truncation    # Inhibit string operation truncation warnings
 )
 
+# Compatibility shims for older cFE versions
+include("${CMAKE_CURRENT_LIST_DIR}/cfs_compat.cmake")
+

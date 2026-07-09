@@ -26,3 +26,6 @@ add_compile_options(
 add_definitions(
     -D_XOPEN_SOURCE=600
 )
+
+# Compatibility shims for older cFE versions
+include("${CMAKE_CURRENT_LIST_DIR}/cfs_compat.cmake")

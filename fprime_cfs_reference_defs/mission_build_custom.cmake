@@ -28,4 +28,4 @@ add_definitions(
 )
 
 # Compatibility shims for older cFE versions
-include("${CMAKE_CURRENT_LIST_DIR}/cfs_compat.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/../libs/fprime_cfs/cmake/cfs_compat.cmake")

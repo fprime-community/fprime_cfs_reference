@@ -29,3 +29,7 @@ add_definitions(
 
 # Make fprime_cfs CMake modules (e.g. cfs_compat) available via include()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../libs/fprime_cfs/cmake")
+
+# F Prime libraries used by this mission. fprime_cfs/mission_build.cmake exports the list to the arch builds, where
+# fprime_cfs/arch_build.cmake loads the F Prime build system; add further libraries (e.g. libs/<name>) here.
+list(APPEND FPRIME_LIBRARY_LOCATIONS "${CMAKE_CURRENT_LIST_DIR}/../libs/fprime_cfs")

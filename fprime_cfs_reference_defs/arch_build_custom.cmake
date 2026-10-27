@@ -40,6 +40,3 @@ add_compile_options(
 # Make fprime_cfs CMake modules (e.g. cfs_compat) available via include()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../libs/fprime_cfs/cmake")
 
-
-# F Prime is loaded while cFS prepares the arch build (libs/fprime_cfs/arch_build.cmake); it needs the C++ compiler known then
-enable_language(CXX)

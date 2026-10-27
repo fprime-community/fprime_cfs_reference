@@ -26,6 +26,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+      # Fetch tags without on-demand submodule recursion: the setup action's own `git fetch --tags` would
+      # otherwise walk every upstream branch's submodule pins and fail on any pin no longer fetchable.
+      - name: "Fetch tags"
+        run: git fetch --tags --no-recurse-submodules
       - name: "Setup F´ environment"
         uses: nasa/fprime-actions/setup@devel
         with:

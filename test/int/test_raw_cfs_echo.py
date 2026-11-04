@@ -10,6 +10,7 @@ F Prime events and counting telemetry channels rather than commanding anything.
 
 import time
 
+from fprime_gds.common.testing_fw import predicates
 from fprime_gds.common.utils.event_severity import EventSeverity
 
 RESPONDER = "FPrimeApp.echoResponder"
@@ -36,10 +37,11 @@ def test_echo_counters_increment(fprime_test_api):
     for channel in (f"{RESPONDER}.EchoesSent", f"{COMMANDER}.EchoesMatched"):
         first = fprime_test_api.await_telemetry(channel, timeout=TIMEOUT_S)
         assert first is not None, f"No {channel} telemetry received"
-        fprime_test_api.clear_histories()
-        later = fprime_test_api.await_telemetry(channel, timeout=TIMEOUT_S)
-        assert later is not None, f"No further {channel} telemetry received"
-        assert later.get_val() > first.get_val(), f"{channel} did not increase"
+        # The counter only advances once per echo period; wait for a strictly greater value
+        later = fprime_test_api.await_telemetry(
+            channel, value=predicates.greater_than(first.get_val()), timeout=TIMEOUT_S
+        )
+        assert later is not None, f"{channel} did not increase within {TIMEOUT_S}s"
 
 
 def test_no_echo_warnings(fprime_test_api):

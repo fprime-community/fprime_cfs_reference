@@ -15,12 +15,16 @@
 
 /* F Prime tick: command MID for APID 0x090 (see fprime_app) */
 #define FPRIME_TICK_MID 0x1890
+/* Raw cFS commander wakeup (see apps/raw_commander): every 10 seconds */
+#define RAW_COMMANDER_WAKEUP_MID 0x18A4
 
 SCH_LAB_ScheduleTable_t Schedule = {
     .TickRate = 100, /* 100 timer ticks per second */
     .Config   = {
         /* Send the F Prime tick once per second (every 100 ticks) */
         {CFE_SB_MSGID_WRAP_VALUE(FPRIME_TICK_MID), 100, 0},
+        /* Wake the raw cFS commander every 10 seconds (every 1000 ticks) */
+        {CFE_SB_MSGID_WRAP_VALUE(RAW_COMMANDER_WAKEUP_MID), 1000, 0},
     }
 };
 

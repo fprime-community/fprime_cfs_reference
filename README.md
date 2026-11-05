@@ -110,7 +110,7 @@ fprime-gds --communication-selection cfs-lab --framing-selection cfs \
 ```
 
 Pass `--cfs-address`/`--telemetry-destination` when cFS runs on another host (the address
-of the cFS host, and the address of the GDS host as seen from cFS, respectively).
+of the cFS host, and the address of the IPv4 address of the GDS host as seen from cFS; TO_LAB takes no hostnames, respectively).
 
 ## Running the cFS GroundSystem
 

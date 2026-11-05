@@ -16,7 +16,6 @@
 
 #include "to_lab_msgids.h"
 
-/* F Prime packetized telemetry: secondary header flag + APID 0x020 (see fprime_app) */
 /*
 ** F Prime downlink messages: telemetry space packets on the F Prime packet APIDs
 ** (ComCfg.Apid in the fprime_app dictionary). Forwarding them through TO_LAB gives the
@@ -31,7 +30,8 @@
 
 /*
 ** BufLimits: the sum must stay within TO_LAB's telemetry pipe depth (OS_QUEUE_MAX_DEPTH,
-** 50 by default) so no subscription is starved when the pipe fills. Events get the
+** 50 by default; on native Linux the POSIX OSAL truncates the pipe to fs.mqueue.msg_max,
+** 10 unless raised) so no subscription is starved when the pipe fills. Events get the
 ** deepest limit because EVS/event bursts are the largest F Prime downlink burst; this
 ** reference emits only events (0x0802) and packetized telemetry (0x0820), the other
 ** MIDs are subscribed so a project adding channel, file or data-product downlink needs

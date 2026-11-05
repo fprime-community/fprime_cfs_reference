@@ -1,9 +1,8 @@
 # fprime_cfs_reference: A cFS System Using F Prime cFS Applications
 
-This repository contains a minimal cFS system that demonstrates the use of cFS applications built with F Prime. This demonstration includes the following two applications:
+This repository contains a minimal cFS system that demonstrates the use of cFS applications built with F Prime. This demonstration includes the application:
 
 1. `fprime_app`: A simple demonstration app showing how to construct cFS applications using F Prime
-2. `fprime_gds`: An application that bridges the F Prime GDS to the cFS messaging bus
 
 The system also includes the standard cFS lab apps:
 
@@ -13,20 +12,23 @@ The system also includes the standard cFS lab apps:
 - `raw_commander`: native cFS app that every 10 s (SCH_LAB wakeup `0x18A4`) sends command `0x18A0` (function code 1) with a random 1-32 byte payload to the F Prime app and checks the echo on telemetry `0x08A1`, reporting match / mismatch / timeout through EVS
 - `raw_commanded`: native cFS app that answers the F Prime app's command `0x18A2` (function code 1) by echoing the payload on telemetry `0x08A3`, reporting receipt and rejected commands through EVS
 
-`ci_lab` and `to_lab` give the [cFS GroundSystem](https://github.com/nasa/cFS-GroundSystem)
-a direct path to the software bus; `to_lab` is subscribed to the F Prime packetized
-telemetry message (`0x0820`) in `fprime_cfs_reference_defs/tables/cpu1_to_lab_sub.c`.
+`ci_lab` and `to_lab` are the system's only path between the software bus and the ground,
+shared by every ground system: the F Prime GDS (through the `cfs-lab` communication and
+`cfs` framing plugins of the [fprime_cfs](https://github.com/fprime-community/fprime_cfs)
+library), the [cFS GroundSystem](https://github.com/nasa/cFS-GroundSystem), and any other.
+`to_lab` is subscribed to the F Prime downlink messages (telemetry `0x0801`, events
+`0x0802`, files `0x0803`, data products `0x0805`, packetized telemetry `0x0820`) in
+`fprime_cfs_reference_defs/tables/cpu1_to_lab_sub.c`. F Prime events additionally reach cFS
+EVS through `FPrimeCfs.EvsMirror`.
 
 ```mermaid
 flowchart LR
     fprime_app(("fprime_app")) --- Bus[cFS Messaging Bus]
-    fprime_gds(("fprime_gds")) --- Bus
     sch_lab(("sch_lab")) --- Bus
     ci_lab(("ci_lab")) --- Bus
     to_lab(("to_lab")) --- Bus
-    gds["F Prime GDS"] --- fprime_gds
-    cfsgds["cFS GroundSystem"] -- "UDP :1234" --> ci_lab
-    to_lab -- "UDP :2234" --> cfsgds
+    gds["F Prime GDS / cFS GroundSystem"] -- "UDP :1234" --> ci_lab
+    to_lab -- "UDP :2234" --> gds
 ```
 
 ## Setup
@@ -90,11 +92,19 @@ commands.
 
 ## Running the F Prime GDS
 
-The reference hosts a TCP server for the GDS to connect on port `15010`. The GDS can be run with:
+The F Prime GDS commands through `ci_lab` and receives telemetry from `to_lab` using the
+`cfs-lab` communication plugin and `cfs` framing plugin installed by the `fprime_cfs`
+Python package (`./libs/fprime_cfs/python`, part of `requirements.txt`). The plugin sends
+the `TO_LAB` enable-output command itself, so the GDS can be started before or after the
+cFS system:
 
 ```bash
-fprime-gds --ip-port 15010 --dictionary ./build-artifacts/exe/Linux/fprime_app/dict/*Dictionary.json  -n --ip-client
+fprime-gds --communication-selection cfs-lab --framing-selection cfs \
+    --dictionary ./build-artifacts/exe/Linux/fprime_app/dict/*Dictionary.json -n
 ```
+
+Pass `--cfs-address`/`--telemetry-destination` when cFS runs on another host (the address
+of the cFS host, and the address of the GDS host as seen from cFS, respectively).
 
 ## Running the cFS GroundSystem
 

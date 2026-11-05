@@ -17,10 +17,24 @@
 #include "to_lab_msgids.h"
 
 /* F Prime packetized telemetry: secondary header flag + APID 0x020 (see fprime_app) */
-#define FPRIME_PACKETIZED_TLM_MID 0x0820
+/*
+** F Prime downlink messages: telemetry space packets on the F Prime packet APIDs
+** (ComCfg.Apid in the fprime_app dictionary). Forwarding them through TO_LAB gives the
+** F Prime GDS (fprime-gds --communication-selection cfs-lab --framing-selection cfs) and
+** any other ground system on the TO_LAB output the complete F Prime downlink.
+*/
+#define FPRIME_TELEM_MID          0x0801 /* FW_PACKET_TELEM: telemetry channels */
+#define FPRIME_LOG_MID            0x0802 /* FW_PACKET_LOG: events */
+#define FPRIME_FILE_MID           0x0803 /* FW_PACKET_FILE: file downlink */
+#define FPRIME_DP_MID             0x0805 /* FW_PACKET_DP: data products */
+#define FPRIME_PACKETIZED_TLM_MID 0x0820 /* FW_PACKET_PACKETIZED_TLM: packetized telemetry */
 
 TO_LAB_Subs_t Subscriptions = { .Subs = {
-                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_PACKETIZED_TLM_MID), { 0, 0 }, 4 },
+                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_TELEM_MID), { 0, 0 }, 16 },
+                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_LOG_MID), { 0, 0 }, 32 },
+                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_FILE_MID), { 0, 0 }, 16 },
+                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_DP_MID), { 0, 0 }, 16 },
+                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_PACKETIZED_TLM_MID), { 0, 0 }, 16 },
 
                                     /* CFE_SB_MSGID_RESERVED entry to mark the end of valid MsgIds */
                                     { CFE_SB_MSGID_RESERVED, { 0, 0 }, 0 } } };

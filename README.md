@@ -10,6 +10,8 @@ The system also includes the standard cFS lab apps:
 - `sch_lab`: publishes the 1 Hz tick that drives the F Prime application's rate groups
 - `ci_lab`: command ingest, receiving cFS command packets over UDP (port `1234`)
 - `to_lab`: telemetry output, forwarding subscribed software bus telemetry over UDP (port `2234`)
+- `raw_commander`: native cFS app that every 10 s (SCH_LAB wakeup `0x18A4`) sends command `0x18A0` (function code 1) with a random 1-32 byte payload to the F Prime app and checks the echo on telemetry `0x08A1`, reporting match / mismatch / timeout through EVS
+- `raw_commanded`: native cFS app that answers the F Prime app's command `0x18A2` (function code 1) by echoing the payload on telemetry `0x08A3`, reporting receipt and rejected commands through EVS
 
 `ci_lab` and `to_lab` give the [cFS GroundSystem](https://github.com/nasa/cFS-GroundSystem)
 a direct path to the software bus; `to_lab` is subscribed to the F Prime packetized
@@ -76,6 +78,15 @@ The build is installed in `build-artifacts/exe/cpu1/`. You can run the reference
 cd build-artifacts/exe/cpu1/
 ./core-cpu1
 ```
+
+## Raw cFS inter-application echo
+
+`raw_commander` / `raw_commanded` and the F Prime `EchoResponder` / `EchoCommander` components exchange native
+cFS command and telemetry packets whose payloads are opaque bytes (not F Prime serialized data) and never reach the
+ground. Watch the EVS events on the `core-cpu1` console (`RAW_COMMANDER ... matched`, `RAW_COMMANDED: received echo
+command`) and the F Prime events / counting channels (`FPrimeApp.echoResponder.*`, `FPrimeApp.echoCommander.*`) in
+the GDS; `test/int/test_raw_cfs_echo.py` checks both. Warning events report mismatches, timeouts and rejected
+commands.
 
 ## Running the F Prime GDS
 

@@ -1,6 +1,5 @@
 CFE_LIB, cfe_assert,  CFE_Assert_LibInit, ASSERT_LIB,    0,   0,     0x0, 0;
 CFE_APP, sch_lab,     SCH_LAB_AppMain,    SCH_LAB,  30,   16384, 0x0, 0;
-CFE_APP, fprime_gds,  FPRIME_GDS_Main,    FPRIME_GDS,   25,   16384, 0x0, 0;
 CFE_APP, fprime_app,  FPRIME_APP_Main,    FPRIME_APP,   25,   65536, 0x0, 0;
 CFE_APP, ci_lab,      CI_LAB_AppMain,     CI_LAB,       60,   16384, 0x0, 0;
 CFE_APP, raw_commander, RAW_COMMANDER_Main, RAW_COMMANDER, 70, 16384, 0x0, 0;

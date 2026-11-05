@@ -1,12 +1,12 @@
 /*
 ** Mission override of the to_lab subscription table.
 **
-** Subscribes TO_LAB to the F Prime packetized telemetry stream so the
-** cFS GroundSystem receives it directly over UDP. The fprime_app telemetry
-** framing produces space packets with the secondary header flag set, so the
-** message ID is the secondary header flag (0x0800) plus the packetized
-** telemetry APID (ComCfg.Apid.FW_PACKET_PACKETIZED_TLM = 0x020, chosen to
-** stay clear of the default cFE core housekeeping telemetry topics).
+** Subscribes TO_LAB to every F Prime downlink stream so the ground systems
+** (F Prime GDS through the fprime_cfs plugins, cFS GroundSystem, others)
+** receive them over UDP. The fprime_app framing produces space packets with
+** the secondary header flag set, so each message ID is the secondary header
+** flag (0x0800) plus the F Prime packet APID (ComCfg.Apid; 0x020 for
+** packetized telemetry stays clear of the cFE core housekeeping topics).
 */
 
 #include "cfe_tbl_filedef.h" /* Required to obtain the CFE_TBL_FILEDEF macro definition */
@@ -16,11 +16,33 @@
 
 #include "to_lab_msgids.h"
 
-/* F Prime packetized telemetry: secondary header flag + APID 0x020 (see fprime_app) */
-#define FPRIME_PACKETIZED_TLM_MID 0x0820
+/*
+** F Prime downlink messages: telemetry space packets on the F Prime packet APIDs
+** (ComCfg.Apid in the fprime_app dictionary). Forwarding them through TO_LAB gives the
+** F Prime GDS (fprime-gds --communication-selection cfs-lab --framing-selection cfs) and
+** any other ground system on the TO_LAB output the complete F Prime downlink.
+*/
+#define FPRIME_TELEM_MID          0x0801 /* FW_PACKET_TELEM: telemetry channels */
+#define FPRIME_LOG_MID            0x0802 /* FW_PACKET_LOG: events */
+#define FPRIME_FILE_MID           0x0803 /* FW_PACKET_FILE: file downlink */
+#define FPRIME_DP_MID             0x0805 /* FW_PACKET_DP: data products */
+#define FPRIME_PACKETIZED_TLM_MID 0x0820 /* FW_PACKET_PACKETIZED_TLM: packetized telemetry */
 
+/*
+** BufLimits: the sum must stay within TO_LAB's telemetry pipe depth (OS_QUEUE_MAX_DEPTH,
+** 50 by default; on native Linux the POSIX OSAL truncates the pipe to fs.mqueue.msg_max,
+** 10 unless raised) so no subscription is starved when the pipe fills. Events get the
+** deepest limit because EVS/event bursts are the largest F Prime downlink burst; this
+** reference emits only events (0x0802) and packetized telemetry (0x0820), the other
+** MIDs are subscribed so a project adding channel, file or data-product downlink needs
+** no table change.
+*/
 TO_LAB_Subs_t Subscriptions = { .Subs = {
-                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_PACKETIZED_TLM_MID), { 0, 0 }, 4 },
+                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_TELEM_MID), { 0, 0 }, 8 },
+                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_LOG_MID), { 0, 0 }, 24 },
+                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_FILE_MID), { 0, 0 }, 5 },
+                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_DP_MID), { 0, 0 }, 5 },
+                                    { CFE_SB_MSGID_WRAP_VALUE(FPRIME_PACKETIZED_TLM_MID), { 0, 0 }, 8 },
 
                                     /* CFE_SB_MSGID_RESERVED entry to mark the end of valid MsgIds */
                                     { CFE_SB_MSGID_RESERVED, { 0, 0 }, 0 } } };

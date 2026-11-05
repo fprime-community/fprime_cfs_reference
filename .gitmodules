@@ -28,9 +28,6 @@
 [submodule "fprime_app"]
 	path = apps/fprime_app
 	url = https://github.com/fprime-community/fprime_app.git
-[submodule "fprime_gds"]
-	path = apps/fprime_gds
-	url = https://github.com/fprime-community/fprime_gds.git
 [submodule "libs/fprime_cfs"]
 	path = libs/fprime_cfs
 	url = https://github.com/fprime-community/fprime_cfs.git

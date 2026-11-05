@@ -30,6 +30,8 @@ jobs:
         uses: nasa/fprime-actions/setup@devel
         with:
           location: ./libs/fprime
+      - name: "Install fprime_cfs GDS plugins"
+        run: pip3 install -r requirements.txt
       - name: "Build"
         run: |
           make SIMULATION=native prep

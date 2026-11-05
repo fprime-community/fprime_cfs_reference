@@ -13,11 +13,17 @@ The system also includes the standard cFS lab apps:
 - `raw_commanded`: native cFS app that answers the F Prime app's command `0x18A2` (function code 1) by echoing the payload on telemetry `0x08A3`, reporting receipt and rejected commands through EVS
 
 `ci_lab` and `to_lab` are the system's only path between the software bus and the ground,
-shared by every ground system: the F Prime GDS (through the `cfs-lab` communication and
+used by every ground system, one at a time (`to_lab` forwards to the single destination
+last named in a TO_LAB enable-output command, which the `cfs-lab` plugin sends on connect
+and after each quiet interval): the F Prime GDS (through the `cfs-lab` communication and
 `cfs` framing plugins of the [fprime_cfs](https://github.com/fprime-community/fprime_cfs)
 library), the [cFS GroundSystem](https://github.com/nasa/cFS-GroundSystem), and any other.
+This path is plain UDP with no authentication or integrity protection: isolated lab and
+bench networks only.
 `to_lab` is subscribed to the F Prime downlink messages (telemetry `0x0801`, events
-`0x0802`, files `0x0803`, data products `0x0805`, packetized telemetry `0x0820`) in
+`0x0802`, files `0x0803`, data products `0x0805`, packetized telemetry `0x0820`; this
+reference produces only events and packetized telemetry, the others are subscribed so a
+project adding channel, file or data-product downlink needs no table change) in
 `fprime_cfs_reference_defs/tables/cpu1_to_lab_sub.c`. F Prime events additionally reach cFS
 EVS through `FPrimeCfs.EvsMirror`.
 

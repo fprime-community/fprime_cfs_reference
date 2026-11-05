@@ -109,14 +109,16 @@ fprime-gds --communication-selection cfs-lab --framing-selection cfs \
     --dictionary ./build-artifacts/exe/Linux/fprime_app/dict/*Dictionary.json -n
 ```
 
-Pass `--cfs-address`/`--telemetry-destination` when cFS runs on another host (the address
-of the cFS host, and the address of the IPv4 address of the GDS host as seen from cFS; TO_LAB takes no hostnames, respectively).
+Pass `--cfs-address`/`--telemetry-destination` when cFS runs on another host: the address
+of the cFS host, and the IPv4 dotted quad of the GDS host as seen from cFS (TO_LAB takes no
+hostnames), respectively.
 
 ## Running the cFS GroundSystem
 
 The cFS GroundSystem can command and monitor the system directly through `ci_lab` and
 `to_lab` using the `fprime-cfs` tooling from the
-[fprime_cfs](https://github.com/fprime-community/fprime_cfs) library:
+[fprime_cfs](https://github.com/fprime-community/fprime_cfs) library (its GUI needs the
+`groundsystem` extra: `pip install './libs/fprime_cfs/python[groundsystem]'`):
 
 ```bash
 fprime-cfs --dictionary ./build-artifacts/exe/Linux/fprime_app/dict/*Dictionary.json \

@@ -10,5 +10,6 @@
 #define RAW_COMMANDED_PIPE_ERR_EID     7
 #define RAW_COMMANDED_SEND_ERR_EID     8
 #define RAW_COMMANDED_MID_ERR_EID      9
+#define RAW_COMMANDED_MSG_ERR_EID      10
 
 #endif

@@ -69,11 +69,14 @@ jobs:
           build-artifacts/native/default_cpu1/cosmos/bundles/FPRIME_APP FPRIME_APP
           --nasa build-artifacts/native/default_cpu1/cosmos/cfs-cosmos-plugin
           --image "$OPENC3_IMAGE"
-      - name: "Build COSMOS plugin gem with the docker builder"
-        run: >-
-          COSMOS_GEM_BUILDER=docker COSMOS_IMAGE="$OPENC3_IMAGE"
-          cosmos/build-plugin.sh build-artifacts/native/default_cpu1/cosmos/cfs-cosmos-plugin 0.0.0-docker
-          build-artifacts/native/default_cpu1/cosmos/docker-builder
+      - name: "Build and check the gem with the docker builder"
+        run: |
+          COSMOS_GEM_BUILDER=docker COSMOS_IMAGE="$OPENC3_IMAGE" cosmos/build-plugin.sh \
+            build-artifacts/native/default_cpu1/cosmos/cfs-cosmos-plugin 0.0.0.pre.docker \
+            build-artifacts/native/default_cpu1/cosmos/docker-builder
+          cosmos/check-plugin.sh build-artifacts/native/default_cpu1/cosmos/cfs-cosmos-plugin \
+            build-artifacts/native/default_cpu1/cosmos/docker-builder/openc3-cosmos-cfs-0.0.0.pre.docker.gem 1 \
+            build-artifacts/native/default_cpu1/cosmos/bundles/FPRIME_APP
       - name: "Collect COSMOS plugin artifact"
         run: cp cosmos/vars.json cosmos/compose.override.yaml build-artifacts/native/default_cpu1/cosmos/
       - name: "Archive COSMOS plugin"

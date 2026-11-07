@@ -23,13 +23,14 @@
 # COSMOS delivery, so it drives the same two command line tools from here instead.
 #
 # Prerequisites: `pip install -r requirements.txt` (installs libs/fprime_cfs_cosmos, which provides the two command
-# line tools used here) and initialized submodules. Without the tools the targets are not defined (a warning says so)
+# line tools used here) and initialized submodules. Without either, the targets are not defined (a warning says so)
 # and the rest of the build is unaffected.
 #
-# Dependency tracking: the commands depend on the dictionaries, every file of both submodules (globbed with
-# CONFIGURE_DEPENDS so a submodule bump is seen without reconfiguring by hand) and cosmos/config.txt, which records
-# the cache options above and both file lists; Makefiles would otherwise notice neither an option change nor a
-# removed file.
+# Dependency tracking: the commands depend on the dictionaries, every file of the nasa submodule and the generator's
+# src/ + pyproject.toml (globbed with CONFIGURE_DEPENDS so a submodule bump is seen without reconfiguring by hand) and
+# cosmos/config.txt, which records
+# the cache options above, both file lists and a hash of the pip-installed generator (the copy that actually runs);
+# Makefiles would otherwise notice neither an option change, nor a removed file, nor a re-install.
 ####
 option(COSMOS_PLUGIN "Define the COSMOS plugin build targets (cosmos_bundles, cosmos_merge, cosmos_plugin)" ON)
 set(COSMOS_PLUGIN_VERSION "1.0.0" CACHE STRING "Version of the built COSMOS plugin gem")
@@ -48,7 +49,8 @@ set(COSMOS_STAGE_DIR "${COSMOS_BUILD_DIR}/cfs-cosmos-plugin")
 set(COSMOS_GEM "${COSMOS_BUILD_DIR}/openc3-cosmos-cfs-${COSMOS_PLUGIN_VERSION}.gem")
 
 if (NOT EXISTS "${COSMOS_PLUGIN_SOURCE}/plugin.txt" OR NOT EXISTS "${COSMOS_GENERATOR_SOURCE}/pyproject.toml")
-    message(FATAL_ERROR "[cosmos] submodules cosmos/cfs-cosmos-plugin and libs/fprime_cfs_cosmos are not checked out; run: git submodule update --init cosmos/cfs-cosmos-plugin libs/fprime_cfs_cosmos (or configure with -DCOSMOS_PLUGIN=OFF)")
+    message(WARNING "[cosmos] submodules cosmos/cfs-cosmos-plugin and libs/fprime_cfs_cosmos are not checked out: the cosmos_plugin targets are not defined. Run `git submodule update --init cosmos/cfs-cosmos-plugin libs/fprime_cfs_cosmos` and reconfigure, or silence this with -DCOSMOS_PLUGIN=OFF")
+    return()
 endif()
 
 find_program(FPRIME_TO_CFS_COSMOS_TARGET fprime-to-cfs-cosmos-target)
@@ -61,25 +63,58 @@ endif()
 if (NOT COSMOS_NUM_CFS_TARGETS MATCHES "^[1-9][0-9]*$")
     message(FATAL_ERROR "[cosmos] COSMOS_NUM_CFS_TARGETS must be a positive integer, got '${COSMOS_NUM_CFS_TARGETS}'")
 endif()
+# RubyGems rewrites other forms (1.0.0-rc1 -> 1.0.0.pre.rc1), and the gem rule names its output from this value
+if (NOT COSMOS_PLUGIN_VERSION MATCHES "^[0-9]+(\\.[0-9A-Za-z]+)*$")
+    message(FATAL_ERROR "[cosmos] COSMOS_PLUGIN_VERSION must be dotted digits/letters as RubyGems keeps them (1.0.0, 1.0.0.pre.rc1), got '${COSMOS_PLUGIN_VERSION}'")
+endif()
+
+# The tools that run are the pip-installed copy of libs/fprime_cfs_cosmos, not the submodule: hash the installed
+# package and the submodule's, warn when they differ (submodule bumped, pip install forgotten) and record the installed
+# hash so a re-install re-generates.
+set(COSMOS_HASH_SCRIPT "import hashlib, pathlib, sys
+root = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path(__import__('fprime_cfs_cosmos_generator').__file__).parent
+digest = hashlib.sha256()
+for path in sorted(p for p in root.rglob('*') if p.is_file() and '__pycache__' not in p.parts):
+    digest.update(path.relative_to(root).as_posix().encode()); digest.update(path.read_bytes())
+print(digest.hexdigest())")
+get_filename_component(COSMOS_TOOL_BIN_DIR "${FPRIME_CFS_COSMOS_MERGE}" DIRECTORY)
+find_program(COSMOS_PYTHON NAMES python3 python HINTS "${COSMOS_TOOL_BIN_DIR}" NO_DEFAULT_PATH)
+if (NOT COSMOS_PYTHON)
+    find_program(COSMOS_PYTHON NAMES python3 python REQUIRED)
+endif()
+execute_process(COMMAND "${COSMOS_PYTHON}" -c "${COSMOS_HASH_SCRIPT}"
+                OUTPUT_VARIABLE COSMOS_GENERATOR_INSTALLED_HASH OUTPUT_STRIP_TRAILING_WHITESPACE RESULT_VARIABLE HASH_RESULT)
+execute_process(COMMAND "${COSMOS_PYTHON}" -c "${COSMOS_HASH_SCRIPT}" "${COSMOS_GENERATOR_SOURCE}/src/fprime_cfs_cosmos_generator"
+                OUTPUT_VARIABLE COSMOS_GENERATOR_SUBMODULE_HASH OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (NOT HASH_RESULT EQUAL 0)
+    set(COSMOS_GENERATOR_INSTALLED_HASH "unknown")
+    message(WARNING "[cosmos] could not inspect the installed fprime_cfs_cosmos_generator with ${COSMOS_PYTHON}")
+elseif (NOT COSMOS_GENERATOR_INSTALLED_HASH STREQUAL COSMOS_GENERATOR_SUBMODULE_HASH)
+    message(WARNING "[cosmos] the installed generator differs from libs/fprime_cfs_cosmos; run: pip install -r requirements.txt (the build uses the installed one)")
+endif()
 
 # Everything the installed generator was built from: a libs/fprime_cfs_cosmos bump (followed by pip install) must
 # regenerate and re-merge even when no dictionary changed.
+# (the extension patterns keep __pycache__ and *.egg-info out of the CONFIGURE_DEPENDS re-check, which compares the raw
+# glob result, so importing or pip-installing the generator does not force a reconfigure)
 file(GLOB_RECURSE COSMOS_GENERATOR_SOURCES CONFIGURE_DEPENDS LIST_DIRECTORIES false
-     "${COSMOS_GENERATOR_SOURCE}/src/*" "${COSMOS_GENERATOR_SOURCE}/pyproject.toml")
-list(FILTER COSMOS_GENERATOR_SOURCES EXCLUDE REGEX "/__pycache__/")
+     "${COSMOS_GENERATOR_SOURCE}/src/*.py" "${COSMOS_GENERATOR_SOURCE}/src/*.rb" "${COSMOS_GENERATOR_SOURCE}/src/*.erb"
+     "${COSMOS_GENERATOR_SOURCE}/src/*.txt" "${COSMOS_GENERATOR_SOURCE}/src/*.json" "${COSMOS_GENERATOR_SOURCE}/pyproject.toml")
+list(FILTER COSMOS_GENERATOR_SOURCES EXCLUDE REGEX "\\.egg-info/")
 # Every file of the nasa plugin (the submodule's .git is a gitlink file)
 file(GLOB_RECURSE COSMOS_PLUGIN_SOURCES CONFIGURE_DEPENDS LIST_DIRECTORIES false "${COSMOS_PLUGIN_SOURCE}/*")
 list(FILTER COSMOS_PLUGIN_SOURCES EXCLUDE REGEX "/\\.git(/|$)")
 
 # Cache options and the two file lists as one file dependency: Makefiles track neither command-line changes nor a
 # file that disappeared from a DEPENDS list (a removed nasa file would otherwise linger in the stage). The timestamp
-# only moves when the content changes.
+# only moves when the content changes. The gem version is not in it: it only names the gem, whose rule re-runs anyway.
 set(COSMOS_CONFIG_STAMP "${COSMOS_BUILD_DIR}/config.txt")
 string(REPLACE ";" "\n" COSMOS_PLUGIN_SOURCE_LIST "${COSMOS_PLUGIN_SOURCES}")
 string(REPLACE ";" "\n" COSMOS_GENERATOR_SOURCE_LIST "${COSMOS_GENERATOR_SOURCES}")
 file(WRITE "${COSMOS_CONFIG_STAMP}.in"
-     "num_cfs_targets=${COSMOS_NUM_CFS_TARGETS}\nversion=${COSMOS_PLUGIN_VERSION}\n"
+     "num_cfs_targets=${COSMOS_NUM_CFS_TARGETS}\n"
      "generate=${FPRIME_TO_CFS_COSMOS_TARGET}\nmerge=${FPRIME_CFS_COSMOS_MERGE}\n"
+     "installed_generator=${COSMOS_GENERATOR_INSTALLED_HASH}\n"
      "[plugin sources]\n${COSMOS_PLUGIN_SOURCE_LIST}\n[generator sources]\n${COSMOS_GENERATOR_SOURCE_LIST}\n")
 configure_file("${COSMOS_CONFIG_STAMP}.in" "${COSMOS_CONFIG_STAMP}" COPYONLY)
 
@@ -116,7 +151,6 @@ function(cosmos_add_fprime_target)
     )
     set(COSMOS_BUNDLE_MANIFESTS ${COSMOS_BUNDLE_MANIFESTS} "${MANIFEST}" PARENT_SCOPE)
     set(COSMOS_BUNDLE_DIRS ${COSMOS_BUNDLE_DIRS} "${BUNDLE_DIR}" PARENT_SCOPE)
-    set(COSMOS_TARGET_NAMES ${COSMOS_TARGET_NAMES} "${APP_TARGET_NAME}" PARENT_SCOPE)
 endfunction()
 
 # One COSMOS target per F Prime app in this mission
@@ -151,13 +185,14 @@ add_custom_command(
 )
 add_custom_target(cosmos_merge DEPENDS "${COSMOS_STAGE_STAMP}")
 
-# Gem, then a content check of what was built (F Prime targets and helpers present, F Prime MAP_TARGETs before the CFS
-# ones, patched instance count) so a regression in either submodule fails the build instead of shipping.
+# Gem, then a content check of what was built (every file each bundle manifest lists and the helpers it requires, in
+# stage and gem; F Prime MAP_TARGETs before the CFS ones; patched instance count) so a regression in either submodule
+# fails the build instead of shipping.
 add_custom_command(
     OUTPUT "${COSMOS_GEM}"
     COMMAND "${COSMOS_SOURCE_DIR}/build-plugin.sh" "${COSMOS_STAGE_DIR}" "${COSMOS_PLUGIN_VERSION}" "${COSMOS_BUILD_DIR}"
     COMMAND "${COSMOS_SOURCE_DIR}/check-plugin.sh" "${COSMOS_STAGE_DIR}" "${COSMOS_GEM}" "${COSMOS_NUM_CFS_TARGETS}"
-            ${COSMOS_TARGET_NAMES}
+            ${COSMOS_BUNDLE_DIRS}
     DEPENDS "${COSMOS_STAGE_STAMP}" "${COSMOS_SOURCE_DIR}/build-plugin.sh" "${COSMOS_SOURCE_DIR}/check-plugin.sh"
     COMMENT "[cosmos] Building and checking ${COSMOS_GEM}"
     VERBATIM

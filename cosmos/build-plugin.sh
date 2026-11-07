@@ -34,7 +34,7 @@ host)
     ;;
 docker)
     image=${COSMOS_IMAGE:-openc3inc/openc3-cosmos-cmd-tlm-api:7.5.1}
-    docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e VERSION="$version" \
+    docker run --rm --network none -u "$(id -u):$(id -g)" -e HOME=/tmp -e VERSION="$version" \
         -v "$stage:/plugin" -w /plugin "$image" gem build --quiet "$gemspec"
     ;;
 *)
@@ -44,5 +44,6 @@ docker)
 esac
 
 built=$(ls "$stage"/*.gem)
+rm -f "$out"/openc3-cosmos-cfs-*.gem
 mv "$built" "$out/"
 echo "$out/$(basename "$built")"

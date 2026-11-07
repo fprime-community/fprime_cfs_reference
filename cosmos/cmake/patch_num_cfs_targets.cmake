@@ -5,8 +5,8 @@
 #
 # The plugin hard-codes `$cfs_fleet_globals_num_cfs_targets = 2` (no plugin VARIABLE). Exactly one such assignment at
 # the start of a line (comments do not count) must exist, or the plugin layout changed and this script must be revisited.
-# With PLUGIN_TXT, COUNT may not exceed the `VARIABLE cfs_<n>_intf_ip` declarations the plugin renders interfaces for;
-# a larger count builds a gem that only fails at `openc3.sh cli load`.
+# With PLUGIN_TXT, every instance 1..COUNT must have its `VARIABLE cfs_<n>_intf_ip` declaration in the plugin; a
+# count beyond them builds a gem that only fails at `openc3.sh cli load`.
 ####
 if (NOT DEFINED FILE OR NOT DEFINED COUNT OR FILE STREQUAL "" OR COUNT STREQUAL "")
     message(FATAL_ERROR "patch_num_cfs_targets.cmake: FILE and COUNT are required")
@@ -19,11 +19,11 @@ if (NOT EXISTS "${FILE}")
 endif()
 if (DEFINED PLUGIN_TXT AND NOT PLUGIN_TXT STREQUAL "")
     file(READ "${PLUGIN_TXT}" PLUGIN_CONTENT)
-    string(REGEX MATCHALL "(^|\n)[ \t]*VARIABLE[ \t]+cfs_[0-9]+_intf_ip[ \t]" INTF_VARIABLES "${PLUGIN_CONTENT}")
-    list(LENGTH INTF_VARIABLES MAX_COUNT)
-    if (COUNT GREATER MAX_COUNT)
-        message(FATAL_ERROR "patch_num_cfs_targets.cmake: COUNT=${COUNT} but ${PLUGIN_TXT} declares cfs_<n>_intf_ip for only ${MAX_COUNT} instance(s)")
-    endif()
+    foreach(INDEX RANGE 1 ${COUNT})
+        if (NOT PLUGIN_CONTENT MATCHES "(^|\n)[ \t]*VARIABLE[ \t]+cfs_${INDEX}_intf_ip[ \t]")
+            message(FATAL_ERROR "patch_num_cfs_targets.cmake: COUNT=${COUNT} but ${PLUGIN_TXT} declares no VARIABLE cfs_${INDEX}_intf_ip (instance ${INDEX} would render as an error at plugin load)")
+        endif()
+    endforeach()
 endif()
 file(READ "${FILE}" CONTENT)
 set(PATTERN "(^|\n)([ \t]*)\\$cfs_fleet_globals_num_cfs_targets[ \t]*=[ \t]*[0-9]+")

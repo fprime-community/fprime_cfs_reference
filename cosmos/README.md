@@ -35,12 +35,14 @@ instead), `COSMOS_PLUGIN_VERSION` sets the gem version (default `1.0.0`), `COSMO
 instances the nasa plugin connects to (default 1; its source hard-codes 2, and its `plugin.txt` only knows two
 `cfs_<n>_intf_ip` addresses, so 1 or 2). Ruby's `gem` is used when installed, otherwise the build runs it in the OpenC3
 `cmd-tlm-api` container (`COSMOS_GEM_BUILDER=host|docker` forces one, `COSMOS_IMAGE` overrides the image). Every
-change to the dictionaries, either submodule or the options above rebuilds the affected steps; after a
+change to the dictionaries, the nasa submodule, the generator's `src/`/`pyproject.toml` or the options above rebuilds
+the affected steps; after a
 `libs/fprime_cfs_cosmos` bump also re-run `pip install -r requirements.txt` so the installed tools match.
 
-The built gem is checked (`check-plugin.sh`): the F Prime targets and the merge's helpers are in it, their `MAP_TARGET`
-lines precede the CFS ones (nasa's ID-less file packets would otherwise swallow every F Prime packet) and the instance
-count is the requested one. CI (pull requests, pushes to `devel`/`main`) builds the gem, renders the generated target
+The built gem is checked (`check-plugin.sh`): every file each bundle's `manifest.json` lists and the helpers it requires
+are in the stage and the gem, the F Prime `MAP_TARGET` lines precede the CFS ones (nasa's ID-less file packets would
+otherwise swallow every F Prime packet) and the instance count is the requested one. The merged `plugin.txt` itself is
+only grep-checked, not ERB-rendered: COSMOS renders it at `cli load`. CI (pull requests, pushes to `devel`/`main`) builds the gem, renders the generated target
 against the real openc3 gem (`libs/fprime_cfs_cosmos/tests/cosmos/run.sh`), exercises the docker gem builder once and
 publishes gem, `vars.json` and `compose.override.yaml` as the `cosmos-plugin` workflow artifact.
 
@@ -68,8 +70,9 @@ Adding another F Prime app is one `cosmos_add_fprime_target(...)` call in `cmake
    - `global_tlm_output_ip`: address the plugin's TO_LAB enable-output command tells cFS to send telemetry to (UDP
      2234). `127.0.0.1` reaches the published port when cFS runs on the docker host; otherwise the COSMOS host's address.
    - `fprime_fprime_app_target_name`: name of the generated F Prime target (default `FPRIME_APP`).
-3. Start the reference (`build-artifacts/exe/cpu1/core-cpu1`) and send `CFS-1 TO_LAB_CMD_ENABLE_OUTPUT` (or any command;
-   the plugin's `CFS_FLEET` procedures do this) — `to_lab` sends nothing until output is enabled, and it has a single
+3. Start the reference (`build-artifacts/exe/cpu1/core-cpu1`) and send `CFS-1 TO_LAB_CMD_ENABLE_OUTPUT` (its `DEST_IP`
+   defaults to `global_tlm_output_ip`; the plugin's `CFS_FLEET`/`CFS` test procedures send it too) — `to_lab` sends
+   nothing until that command enables output, and it has a single
    destination, so run COSMOS or `fprime-gds` against one cFS instance, not both. On one host they also contend for
    UDP 2234 itself: with the override above the operator container holds the port, and `fprime-gds`'s `cfs-lab` adapter
    fails with `Address already in use` until COSMOS (or just `openc3-operator`) is stopped.
@@ -81,9 +84,11 @@ Then `FPRIME_APP` carries the F Prime commands (`CfsCore.cmdDisp.CMD_NO_OP`, ...
 
 - F Prime event packets (stream id 0x0802) have no `FPRIME_APP` definition yet and are swallowed by the nasa catch-all
   file packets; use `fprime-gds` for events until the generator emits an EVENTS packet.
+- CI renders the generated target in the real openc3 gem but not the merged `plugin.txt` (the generator's load test has
+  no merged-plugin mode yet); an unbalanced ERB edit there would surface at `openc3.sh cli load`.
 - The nasa plugin has no VARIABLE for the number of cFS instances (`$cfs_fleet_globals_num_cfs_targets`), hence the
-  staged-copy patch; `COSMOS_NUM_CFS_TARGETS=2` maps the F Prime target onto both `CFS-<n>_INTF`s (and needs 2235/udp
-  published as well).
+  staged-copy patch; `COSMOS_NUM_CFS_TARGETS=2` maps the F Prime target onto both `CFS-<n>_INTF`s and needs 2235/udp
+  published and `cfs_2_intf_ip` added to `vars.json` (nasa's default is `172.17.0.1`, docker0, not the compose gateway).
 - `cosmos/cfs-cosmos-plugin` pins the tip of nasa's `dev` branch (the compatible layout the merge was validated
   against), not a release tag; bump deliberately and let `make cosmos_plugin` (patch detector, `check-plugin.sh`) and
   the CI load test judge the new tree.

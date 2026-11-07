@@ -4,4 +4,4 @@
 services:
   openc3-operator:
     ports:
-      - "2234:2234/udp" # cFS TO_LAB telemetry into the cFS plugin's CFS-1 udp_interface
+      - "127.0.0.1:2234:2234/udp" # cFS TO_LAB telemetry (local cFS, vars.json global_tlm_output_ip) into CFS-1_INTF; widen to "2234:2234/udp" for a remote cFS

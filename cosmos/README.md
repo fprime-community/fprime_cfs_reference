@@ -22,36 +22,57 @@ make cosmos_plugin                        # -> build-artifacts/native/default_cp
 ```
 
 Intermediate targets: `make cosmos_bundles` (generated F Prime targets under `.../cosmos/bundles/<TARGET>/`),
-`make cosmos_merge` (the merged plugin tree under `.../cosmos/cfs-cosmos-plugin/`). CMake cache options (pass with
-`make prep` through `PREP_OPTS`, or edit the arch build's `CMakeCache.txt`): `COSMOS_PLUGIN=OFF` skips all of this,
-`COSMOS_PLUGIN_VERSION` sets the gem version (default `1.0.0`), `COSMOS_NUM_CFS_TARGETS` the number of cFS instances
-the nasa plugin connects to (default 1; its source hard-codes 2). Ruby's `gem` is used when installed, otherwise the
-build runs it in the OpenC3 `cmd-tlm-api` container (`COSMOS_IMAGE` to override the image).
+`make cosmos_merge` (the merged plugin tree under `.../cosmos/cfs-cosmos-plugin/`; its `.stage.stamp` marks a complete
+stage, so deleting the tree rebuilds it). The CMake options live in the *arch* build's cache, which cFE configures
+itself (the `make prep` options do not reach it), so set them there and rebuild:
 
-CI builds the gem on every push and publishes it with `vars.json` and `compose.override.yaml` as the `cosmos-plugin`
-artifact, after rendering the generated target against the real openc3 gem (`libs/fprime_cfs_cosmos/tests/cosmos/run.sh`).
+```bash
+cmake -DCOSMOS_NUM_CFS_TARGETS=2 build-artifacts/native/default_cpu1 && make cosmos_plugin
+```
+
+`COSMOS_PLUGIN=OFF` skips all of this (without the generator tools on `PATH` the targets are skipped with a warning
+instead), `COSMOS_PLUGIN_VERSION` sets the gem version (default `1.0.0`), `COSMOS_NUM_CFS_TARGETS` the number of cFS
+instances the nasa plugin connects to (default 1; its source hard-codes 2, and its `plugin.txt` only knows two
+`cfs_<n>_intf_ip` addresses, so 1 or 2). Ruby's `gem` is used when installed, otherwise the build runs it in the OpenC3
+`cmd-tlm-api` container (`COSMOS_GEM_BUILDER=host|docker` forces one, `COSMOS_IMAGE` overrides the image). Every
+change to the dictionaries, either submodule or the options above rebuilds the affected steps; after a
+`libs/fprime_cfs_cosmos` bump also re-run `pip install -r requirements.txt` so the installed tools match.
+
+The built gem is checked (`check-plugin.sh`): the F Prime targets and the merge's helpers are in it, their `MAP_TARGET`
+lines precede the CFS ones (nasa's ID-less file packets would otherwise swallow every F Prime packet) and the instance
+count is the requested one. CI (pull requests, pushes to `devel`/`main`) builds the gem, renders the generated target
+against the real openc3 gem (`libs/fprime_cfs_cosmos/tests/cosmos/run.sh`), exercises the docker gem builder once and
+publishes gem, `vars.json` and `compose.override.yaml` as the `cosmos-plugin` workflow artifact.
+
+The gem keeps nasa's name `openc3-cosmos-cfs` (the gemspec is theirs): in a COSMOS scope it *replaces* an installed
+nasa plugin (`openc3.sh cli unload openc3-cosmos-cfs-<old>.gem__0` first) rather than sitting beside it.
 
 Adding another F Prime app is one `cosmos_add_fprime_target(...)` call in `cmake/cosmos_plugin.cmake`.
 
 ## Running
 
 1. COSMOS project ([openc3-project](https://github.com/OpenC3/cosmos-project)): copy `compose.override.yaml` next to its
-   `compose.yaml` (publishes UDP 2234 on the operator so cFS `to_lab` telemetry reaches the plugin's `CFS-1`
-   interface), then `./openc3.sh run`.
+   `compose.yaml` (publishes UDP 2234 on the operator's loopback so `to_lab` telemetry from a cFS on the same host
+   reaches the plugin's `CFS-1` interface; widen it to `"2234:2234/udp"` for a cFS on another machine), then
+   `./openc3.sh run`.
 2. Install the plugin with the variables for this reference (`vars.json`):
 
    ```bash
    ./openc3.sh cli load /path/to/openc3-cosmos-cfs-1.0.0.gem --variables /path/to/vars.json
    ```
 
-   - `cfs_1_intf_ip`: address COSMOS sends commands to (`ci_lab`, UDP 1234). `172.18.0.1` is the gateway of the
-     default `openc3-cosmos-network`, i.e. the docker host when cFS runs there; use the cFS host's address otherwise.
+   - `cfs_1_intf_ip`: address COSMOS sends commands to (`ci_lab`, UDP 1234). For a cFS on the docker host this is the
+     gateway of the COSMOS compose network, `172.18.0.1` on a host where it is the first user-defined network — check
+     with `docker network inspect <network> -f '{{(index .IPAM.Config 0).Gateway}}'` (`docker network ls` names it);
+     use the cFS host's address otherwise.
    - `global_tlm_output_ip`: address the plugin's TO_LAB enable-output command tells cFS to send telemetry to (UDP
      2234). `127.0.0.1` reaches the published port when cFS runs on the docker host; otherwise the COSMOS host's address.
    - `fprime_fprime_app_target_name`: name of the generated F Prime target (default `FPRIME_APP`).
-3. Start the reference (`build-artifacts/exe/cpu1/core-cpu1`) and send `CFS-1 TO_LAB_ENABLE_OUTPUT` (or any command;
+3. Start the reference (`build-artifacts/exe/cpu1/core-cpu1`) and send `CFS-1 TO_LAB_CMD_ENABLE_OUTPUT` (or any command;
    the plugin's `CFS_FLEET` procedures do this) — `to_lab` sends nothing until output is enabled, and it has a single
-   destination, so run COSMOS or `fprime-gds` against one cFS instance, not both.
+   destination, so run COSMOS or `fprime-gds` against one cFS instance, not both. On one host they also contend for
+   UDP 2234 itself: with the override above the operator container holds the port, and `fprime-gds`'s `cfs-lab` adapter
+   fails with `Address already in use` until COSMOS (or just `openc3-operator`) is stopped.
 
 Then `FPRIME_APP` carries the F Prime commands (`CfsCore.cmdDisp.CMD_NO_OP`, ...), channelized and packetized telemetry
 (`HEALTH`, ...), and `CFS-1` the cFE/cFS ones; both targets decode on the same `CFS-1_INTF`.
@@ -61,5 +82,12 @@ Then `FPRIME_APP` carries the F Prime commands (`CfsCore.cmdDisp.CMD_NO_OP`, ...
 - F Prime event packets (stream id 0x0802) have no `FPRIME_APP` definition yet and are swallowed by the nasa catch-all
   file packets; use `fprime-gds` for events until the generator emits an EVENTS packet.
 - The nasa plugin has no VARIABLE for the number of cFS instances (`$cfs_fleet_globals_num_cfs_targets`), hence the
-  staged-copy patch; `COSMOS_NUM_CFS_TARGETS` greater than 1 maps the F Prime target onto every `CFS-<n>_INTF`.
-- `libs/fprime_cfs_cosmos` tracks the `nasa-plugin-compat` branch of the autobot fork until the generator PR merges.
+  staged-copy patch; `COSMOS_NUM_CFS_TARGETS=2` maps the F Prime target onto both `CFS-<n>_INTF`s (and needs 2235/udp
+  published as well).
+- `cosmos/cfs-cosmos-plugin` pins the tip of nasa's `dev` branch (the compatible layout the merge was validated
+  against), not a release tag; bump deliberately and let `make cosmos_plugin` (patch detector, `check-plugin.sh`) and
+  the CI load test judge the new tree.
+- `libs/fprime_cfs_cosmos` points at the `nasa-plugin-compat` branch of the `lestarch-autobot` fork, i.e.
+  [LeStarch/fprime-cfs-cosmos-one-app-one-target-generator#1](https://github.com/LeStarch/fprime-cfs-cosmos-one-app-one-target-generator/pull/1).
+  When that PR merges, point `url`/`branch` in `.gitmodules` at `LeStarch/...` `main`, `git submodule sync`, bump the
+  pin and re-run `pip install -r requirements.txt`.

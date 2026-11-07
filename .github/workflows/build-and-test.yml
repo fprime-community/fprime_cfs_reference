@@ -19,6 +19,10 @@ jobs:
   build-and-test:
     name: "Build and Integration Tests"
     runs-on: ubuntu-22.04
+    env:
+      # openc3inc/openc3-cosmos-cmd-tlm-api:7.5.1, pinned by digest (renders the plugin in the load test, builds the gem
+      # in the docker builder check)
+      OPENC3_IMAGE: openc3inc/openc3-cosmos-cmd-tlm-api@sha256:7b259b14533a94e786899deccaeaa477f1d60aaed07c8a25e907f9232384f14c
     steps:
       - name: "Make Space"
         uses: nasa/fprime-actions/make-space@devel
@@ -37,22 +41,6 @@ jobs:
           make SIMULATION=native prep
           make
           make install
-      - name: "Build COSMOS plugin"
-        run: make cosmos_plugin
-      - name: "Load test COSMOS plugin"
-        run: >-
-          libs/fprime_cfs_cosmos/tests/cosmos/run.sh
-          build-artifacts/native/default_cpu1/cosmos/bundles/FPRIME_APP FPRIME_APP
-          --nasa build-artifacts/native/default_cpu1/cosmos/cfs-cosmos-plugin
-      - name: "Archive COSMOS plugin"
-        uses: actions/upload-artifact@v4
-        with:
-          name: cosmos-plugin
-          path: |
-            build-artifacts/native/default_cpu1/cosmos/*.gem
-            cosmos/vars.json
-            cosmos/compose.override.yaml
-          if-no-files-found: error
       - name: "Run Integration Tests"
         uses: nasa/fprime-actions/run-integration-tests@devel
         with:
@@ -73,3 +61,27 @@ jobs:
           name: cfs-reference-logs
           path: build-artifacts/exe/cpu1/gds-logs
           retention-days: 5
+      - name: "Build COSMOS plugin"
+        run: make cosmos_plugin
+      - name: "Load test COSMOS plugin"
+        run: >-
+          libs/fprime_cfs_cosmos/tests/cosmos/run.sh
+          build-artifacts/native/default_cpu1/cosmos/bundles/FPRIME_APP FPRIME_APP
+          --nasa build-artifacts/native/default_cpu1/cosmos/cfs-cosmos-plugin
+          --image "$OPENC3_IMAGE"
+      - name: "Build COSMOS plugin gem with the docker builder"
+        run: >-
+          COSMOS_GEM_BUILDER=docker COSMOS_IMAGE="$OPENC3_IMAGE"
+          cosmos/build-plugin.sh build-artifacts/native/default_cpu1/cosmos/cfs-cosmos-plugin 0.0.0-docker
+          build-artifacts/native/default_cpu1/cosmos/docker-builder
+      - name: "Collect COSMOS plugin artifact"
+        run: cp cosmos/vars.json cosmos/compose.override.yaml build-artifacts/native/default_cpu1/cosmos/
+      - name: "Archive COSMOS plugin"
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmos-plugin
+          path: |
+            build-artifacts/native/default_cpu1/cosmos/openc3-cosmos-cfs-*.gem
+            build-artifacts/native/default_cpu1/cosmos/vars.json
+            build-artifacts/native/default_cpu1/cosmos/compose.override.yaml
+          if-no-files-found: error

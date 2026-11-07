@@ -1,0 +1,7 @@
+# Drop-in for the COSMOS project (openc3-project) running the reference plugin: cFS to_lab sends telemetry to UDP 2234,
+# which must reach the plugin's CFS-1 udp_interface inside the operator container. openc3.sh merges this file over
+# compose.yaml automatically when it is named compose.override.yaml in the project directory.
+services:
+  openc3-operator:
+    ports:
+      - "127.0.0.1:2234:2234/udp" # cFS TO_LAB telemetry (local cFS, vars.json global_tlm_output_ip) into CFS-1_INTF; widen to "2234:2234/udp" for a remote cFS

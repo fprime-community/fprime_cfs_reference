@@ -40,3 +40,6 @@ add_compile_options(
 # Make fprime_cfs CMake modules (e.g. cfs_compat) available via include()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../libs/fprime_cfs/cmake")
 
+
+# COSMOS plugin: nasa/cfs-cosmos-plugin plus one generated top-level target per F Prime app (see cosmos/README.md)
+include("${CMAKE_CURRENT_LIST_DIR}/../cosmos/cmake/cosmos_plugin.cmake")

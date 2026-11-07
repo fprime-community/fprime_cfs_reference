@@ -1,4 +1,4 @@
-# Builds the F Prime CFS reference (native simulation) and runs the GDS integration tests
+# Builds the F Prime CFS reference (native simulation), the COSMOS plugin, and runs the GDS integration tests
 
 name: "Build and Test"
 
@@ -37,6 +37,22 @@ jobs:
           make SIMULATION=native prep
           make
           make install
+      - name: "Build COSMOS plugin"
+        run: make cosmos_plugin
+      - name: "Load test COSMOS plugin"
+        run: >-
+          libs/fprime_cfs_cosmos/tests/cosmos/run.sh
+          build-artifacts/native/default_cpu1/cosmos/bundles/FPRIME_APP FPRIME_APP
+          --nasa build-artifacts/native/default_cpu1/cosmos/cfs-cosmos-plugin
+      - name: "Archive COSMOS plugin"
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmos-plugin
+          path: |
+            build-artifacts/native/default_cpu1/cosmos/*.gem
+            cosmos/vars.json
+            cosmos/compose.override.yaml
+          if-no-files-found: error
       - name: "Run Integration Tests"
         uses: nasa/fprime-actions/run-integration-tests@devel
         with:

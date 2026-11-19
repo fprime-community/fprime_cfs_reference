@@ -134,9 +134,16 @@ static void RAW_COMMANDER_ProcessEcho(const CFE_SB_Buffer_t *BufPtr)
 {
     CFE_MSG_Size_t size        = 0;
     size_t         payloadSize = 0;
+    int32          status;
     const RAW_COMMANDER_EchoTlm_t *tlm = (const RAW_COMMANDER_EchoTlm_t *)BufPtr;
 
-    CFE_MSG_GetSize(&BufPtr->Msg, &size);
+    status = CFE_MSG_GetSize(&BufPtr->Msg, &size);
+    if (status != CFE_SUCCESS)
+    {
+        CFE_EVS_SendEvent(RAW_COMMANDER_MSG_ERR_EID, CFE_EVS_EventType_ERROR,
+                          "RAW_COMMANDER: echo header read failed, RC = 0x%08lX", (unsigned long)status);
+        return;
+    }
     if (size >= sizeof(CFE_MSG_TelemetryHeader_t))
     {
         payloadSize = size - sizeof(CFE_MSG_TelemetryHeader_t);
@@ -193,7 +200,13 @@ void RAW_COMMANDER_Main(void)
             runStatus = CFE_ES_RunStatus_APP_ERROR;
             continue;
         }
-        CFE_MSG_GetMsgId(&bufPtr->Msg, &msgId);
+        status = CFE_MSG_GetMsgId(&bufPtr->Msg, &msgId);
+        if (status != CFE_SUCCESS)
+        {
+            CFE_EVS_SendEvent(RAW_COMMANDER_MSG_ERR_EID, CFE_EVS_EventType_ERROR,
+                              "RAW_COMMANDER: message ID read failed, RC = 0x%08lX", (unsigned long)status);
+            continue;
+        }
         switch (CFE_SB_MsgIdToValue(msgId))
         {
             case RAW_COMMANDER_WAKEUP_MID:

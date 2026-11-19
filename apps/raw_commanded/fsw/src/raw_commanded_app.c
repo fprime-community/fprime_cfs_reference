@@ -64,10 +64,23 @@ static void RAW_COMMANDED_ProcessCommand(const CFE_SB_Buffer_t *BufPtr)
     size_t             payloadSize = 0;
     const RAW_COMMANDED_EchoCmd_t *cmd = (const RAW_COMMANDED_EchoCmd_t *)BufPtr;
 
-    CFE_MSG_ValidateChecksum(&BufPtr->Msg, &valid);
-    CFE_MSG_GetFcnCode(&BufPtr->Msg, &fcnCode);
-    CFE_MSG_GetSize(&BufPtr->Msg, &size);
-
+    status = CFE_MSG_ValidateChecksum(&BufPtr->Msg, &valid);
+    if (status == CFE_SUCCESS)
+    {
+        status = CFE_MSG_GetFcnCode(&BufPtr->Msg, &fcnCode);
+    }
+    if (status == CFE_SUCCESS)
+    {
+        status = CFE_MSG_GetSize(&BufPtr->Msg, &size);
+    }
+    if (status != CFE_SUCCESS)
+    {
+        RAW_COMMANDED_Global.Rejected++;
+        CFE_EVS_SendEvent(RAW_COMMANDED_MSG_ERR_EID, CFE_EVS_EventType_ERROR,
+                          "RAW_COMMANDED: command rejected, header read failed, RC = 0x%08lX (%lu rejected)",
+                          (unsigned long)status, (unsigned long)RAW_COMMANDED_Global.Rejected);
+        return;
+    }
     if (!valid)
     {
         RAW_COMMANDED_Global.Rejected++;
@@ -141,7 +154,13 @@ void RAW_COMMANDED_Main(void)
             runStatus = CFE_ES_RunStatus_APP_ERROR;
             continue;
         }
-        CFE_MSG_GetMsgId(&bufPtr->Msg, &msgId);
+        status = CFE_MSG_GetMsgId(&bufPtr->Msg, &msgId);
+        if (status != CFE_SUCCESS)
+        {
+            CFE_EVS_SendEvent(RAW_COMMANDED_MSG_ERR_EID, CFE_EVS_EventType_ERROR,
+                              "RAW_COMMANDED: message ID read failed, RC = 0x%08lX", (unsigned long)status);
+            continue;
+        }
         if (CFE_SB_MsgIdToValue(msgId) == RAW_COMMANDED_ECHO_CMD_MID)
         {
             RAW_COMMANDED_ProcessCommand(bufPtr);

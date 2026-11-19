@@ -1,0 +1,8 @@
+{
+  "cfs_eds_enabled": "false",
+  "cfs_mem_addr_size": "64",
+  "cfs_endianness": "LITTLE_ENDIAN",
+  "cfs_1_intf_ip": "172.18.0.1",
+  "global_tlm_output_ip": "127.0.0.1",
+  "fprime_fprime_app_target_name": "FPRIME_APP"
+}

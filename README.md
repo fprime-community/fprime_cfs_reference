@@ -17,7 +17,8 @@ used by every ground system, one at a time (`to_lab` forwards to the single dest
 last named in a TO_LAB enable-output command, which the `cfs-lab` plugin sends on connect
 and after each quiet interval): the F Prime GDS (through the `cfs-lab` communication and
 `cfs` framing plugins of the [fprime_cfs](https://github.com/fprime-community/fprime_cfs)
-library), the [cFS GroundSystem](https://github.com/nasa/cFS-GroundSystem), and any other.
+library), the [cFS GroundSystem](https://github.com/nasa/cFS-GroundSystem),
+[COSMOS](cosmos/README.md) (nasa's cFS plugin plus one generated target per F Prime app), and any other.
 This path is plain UDP with no authentication or integrity protection: isolated lab and
 bench networks only.
 `to_lab` is subscribed to the F Prime downlink messages (telemetry `0x0801`, events
@@ -33,7 +34,7 @@ flowchart LR
     sch_lab(("sch_lab")) --- Bus
     ci_lab(("ci_lab")) --- Bus
     to_lab(("to_lab")) --- Bus
-    gds["F Prime GDS / cFS GroundSystem"] -- "UDP :1234" --> ci_lab
+    gds["F Prime GDS / cFS GroundSystem / COSMOS"] -- "UDP :1234" --> ci_lab
     to_lab -- "UDP :2234" --> gds
 ```
 
@@ -125,5 +126,12 @@ fprime-cfs --dictionary ./build-artifacts/exe/Linux/fprime_app/dict/*Dictionary.
     --ground-system-dir tools/cFS-GroundSystem \
     --deployment build-artifacts/exe/cpu1 --app build-artifacts/exe/cpu1/core-cpu1
 ```
+
+## Running COSMOS
+
+`make cosmos_plugin` builds an OpenC3 COSMOS plugin gem: the unmodified
+[nasa/cfs-cosmos-plugin](https://github.com/nasa/cfs-cosmos-plugin) (`CFS-1` target) plus a separate top-level
+`FPRIME_APP` target generated from the F Prime topology dictionary. Build, installation and network setup are in
+[cosmos/README.md](cosmos/README.md).
 
 Enjoy!

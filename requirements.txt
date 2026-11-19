@@ -1,2 +1,3 @@
 -r ./libs/fprime/requirements.txt
 ./libs/fprime_cfs/python
+./libs/fprime_cfs_cosmos
